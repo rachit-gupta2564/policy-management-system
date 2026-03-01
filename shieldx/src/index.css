@@ -1,6 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #0f4c35;
+  --color-brand-light: #1a7a56;
+  --color-brand-pale: #e8f5ef;
+  --color-brand-dark: #071a12;
+  --color-accent: #e8a020;
+  --color-accent-light: #fdf3e0;
+  --color-accent-dark: #b87d10;
+  --color-surface: #f7f9f8;
+  --color-danger: #c0392b;
+}
 
 @layer base {
   * { box-sizing: border-box; }
