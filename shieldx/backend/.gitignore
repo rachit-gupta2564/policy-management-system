@@ -1,0 +1,7 @@
+node_modules/
+.env
+uploads/kyc/*
+uploads/claims/*
+uploads/certificates/*
+!uploads/.gitkeep
+*.log
