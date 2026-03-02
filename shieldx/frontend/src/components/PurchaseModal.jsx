@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Modal, FormGroup, Input, Select, BtnBrand, BtnGhost } from './ui'
 import { useToast } from '../App'
+import { useAuth } from '../context/AuthContext'
+import { productsAPI, policiesAPI } from '../services/api'
 
-const STEPS = ['Proposal', 'KYC', 'Payment', 'Policy']
+const STEPS = ['Plan', 'Details', 'Review', 'Done']
 
 function StepBar({ current }) {
   return (
@@ -12,13 +14,11 @@ function StepBar({ current }) {
         const done   = n < current
         const active = n === current
         return (
-          <div
-            key={label}
+          <div key={label}
             className={`flex-1 flex items-center gap-2 px-4 py-3 text-sm
-              ${active ? 'bg-brand-pale text-brand font-semibold' :
-                done   ? 'text-brand font-medium' :
-                         'text-gray-400'}`}
-          >
+              ${active ? 'bg-brand-pale text-brand font-semibold'
+              : done   ? 'text-brand font-medium'
+              :          'text-gray-400'}`}>
             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0
               ${active || done ? 'bg-brand text-white' : 'bg-gray-100 text-gray-400'}`}>
               {done ? '✓' : n}
@@ -31,175 +31,318 @@ function StepBar({ current }) {
   )
 }
 
-// ── Step 1 — Proposal ─────────────────────────────────────
-function StepProposal() {
+const TYPE_ICON = { life: '🌿', health: '❤️', vehicle: '🚗' }
+const TYPE_LABEL = { life: 'Life', health: 'Health', vehicle: 'Vehicle' }
+
+// ── Step 1: Choose Plan ───────────────────────────────────
+function StepPlan({ products, selected, onSelect }) {
+  if (!products.length) return (
+    <div className="text-center py-8 text-gray-300">Loading products…</div>
+  )
+  return (
+    <div className="space-y-3">
+      {products.map(p => (
+        <div key={p.id}
+          onClick={() => onSelect(p)}
+          className={`border-2 rounded-xl p-4 cursor-pointer transition-all
+            ${selected?.id === p.id
+              ? 'border-brand bg-brand-pale'
+              : 'border-gray-200 hover:border-brand/50 hover:bg-surface'
+            }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{TYPE_ICON[p.type]}</span>
+            <div className="flex-1">
+              <div className="font-semibold text-sm">{p.name}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{p.description}</div>
+            </div>
+            <div className="text-right">
+              <div className="font-display font-bold text-brand">
+                {+p.base_premium > 0 ? `₹${Number(p.base_premium).toLocaleString('en-IN')}/yr` : 'IDV-based'}
+              </div>
+              <div className="text-xs text-gray-400">base premium</div>
+            </div>
+          </div>
+          {selected?.id === p.id && (
+            <div className="mt-2 pt-2 border-t border-brand/20 grid grid-cols-3 gap-2">
+              {(JSON.parse(p.coverage_details || '{}').features || []).slice(0, 3).map(f => (
+                <div key={f} className="text-xs text-brand flex items-center gap-1">
+                  <span className="text-green-500">✓</span> {f}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Step 2: Details form ──────────────────────────────────
+function StepDetails({ product, form, setForm, user }) {
+  const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
+
   return (
     <>
-      <div className="grid grid-cols-2 gap-4">
-        <FormGroup label="Full Name"><Input placeholder="Arjun Mehta" /></FormGroup>
-        <FormGroup label="Date of Birth"><Input type="date" defaultValue="1994-03-15" /></FormGroup>
+      <div className="bg-brand-pale border border-brand/20 rounded-xl px-4 py-3 mb-5 text-sm text-brand font-medium">
+        {TYPE_ICON[product?.type]} {product?.name}
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormGroup label="Full Name">
+          <Input value={form.full_name} onChange={set('full_name')} placeholder="Your full name" />
+        </FormGroup>
+        <FormGroup label="Date of Birth">
+          <Input type="date" value={form.dob} onChange={set('dob')} />
+        </FormGroup>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <FormGroup label="Gender">
-          <Select><option>Male</option><option>Female</option><option>Other</option></Select>
+          <Select value={form.gender} onChange={set('gender')}>
+            <option value="">Select</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </Select>
         </FormGroup>
-        <FormGroup label="Phone"><Input type="tel" placeholder="9876543210" /></FormGroup>
+        <FormGroup label="Phone">
+          <Input type="tel" value={form.phone} onChange={set('phone')} placeholder="9876543210" />
+        </FormGroup>
       </div>
-      <FormGroup label="Email"><Input type="email" placeholder="arjun@email.com" /></FormGroup>
-      <FormGroup label="Address">
-        <textarea
-          placeholder="123, Brigade Road, Bengaluru — 560001"
-          className="w-full border-[1.5px] border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 min-h-[72px] resize-none"
-        />
+
+      {product?.type === 'life' && (
+        <FormGroup label="Sum Assured (₹)">
+          <Select value={form.sum_assured} onChange={set('sum_assured')}>
+            <option value="1000000">₹10 Lakhs</option>
+            <option value="2500000">₹25 Lakhs</option>
+            <option value="5000000">₹50 Lakhs</option>
+            <option value="10000000">₹1 Crore</option>
+            <option value="25000000">₹2.5 Crore</option>
+            <option value="50000000">₹5 Crore</option>
+          </Select>
+        </FormGroup>
+      )}
+
+      {product?.type === 'health' && (
+        <FormGroup label="Coverage Amount (₹)">
+          <Select value={form.sum_assured} onChange={set('sum_assured')}>
+            <option value="300000">₹3 Lakhs</option>
+            <option value="500000">₹5 Lakhs</option>
+            <option value="1000000">₹10 Lakhs</option>
+            <option value="2000000">₹20 Lakhs</option>
+            <option value="5000000">₹50 Lakhs</option>
+          </Select>
+        </FormGroup>
+      )}
+
+      {product?.type === 'vehicle' && (
+        <>
+          <FormGroup label="Vehicle Registration Number">
+            <Input value={form.vehicle_reg} onChange={set('vehicle_reg')} placeholder="MH01AB1234" />
+          </FormGroup>
+          <FormGroup label="IDV (Insured Declared Value) ₹">
+            <Input type="number" value={form.sum_assured} onChange={set('sum_assured')} placeholder="650000" />
+          </FormGroup>
+        </>
+      )}
+
+      <FormGroup label="Policy Term">
+        <Select value={form.term_years} onChange={set('term_years')}>
+          <option value="1">1 Year</option>
+          {product?.type === 'life' && <option value="10">10 Years</option>}
+          {product?.type === 'life' && <option value="20">20 Years</option>}
+          {product?.type === 'life' && <option value="30">30 Years</option>}
+        </Select>
       </FormGroup>
     </>
   )
 }
 
-// ── Step 2 — KYC ─────────────────────────────────────────
-function StepKYC({ toast }) {
-  return (
-    <>
-      <p className="text-sm text-gray-400 mb-5">Upload identity documents. All files are AES-256 encrypted and stored securely.</p>
-      {[
-        { label: '🪪 Aadhaar Card',  note: 'Front & back scan required' },
-        { label: '📋 PAN Card',      note: 'For income verification' },
-        { label: '🏠 Address Proof', note: 'Utility bill, passport, or bank statement' },
-      ].map(item => (
-        <div
-          key={item.label}
-          onClick={() => toast(`${item.label} uploaded ✓`, 'success')}
-          className="border-[1.5px] border-gray-200 rounded-xl px-5 py-3.5 flex items-center justify-between mb-3 cursor-pointer hover:border-brand hover:bg-brand-pale transition-colors"
-        >
-          <div>
-            <div className="text-sm font-semibold">{item.label}</div>
-            <div className="text-xs text-gray-400 mt-0.5">{item.note}</div>
-          </div>
-          <span className="text-brand text-sm font-semibold">Upload ↑</span>
-        </div>
-      ))}
-    </>
-  )
-}
+// ── Step 3: Review + simulated payment ───────────────────
+function StepReview({ product, form, premium, paying }) {
+  const type = product?.type
+  const sumDisplay = `₹${Number(form.sum_assured || 0).toLocaleString('en-IN')}`
 
-// ── Step 3 — Payment ──────────────────────────────────────
-function StepPayment() {
   return (
     <>
       <div className="bg-surface border border-gray-100 rounded-xl p-5 mb-5 divide-y divide-gray-100">
-        {[['Base Premium','₹18,400'],['GST (18%)','₹3,312']].map(([k,v]) => (
+        <div className="pb-3 mb-1">
+          <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Policy Summary</div>
+          <div className="font-semibold">{product?.name}</div>
+          <div className="text-sm text-gray-500">{TYPE_LABEL[type]} Insurance · {form.term_years} year{+form.term_years > 1 ? 's' : ''}</div>
+        </div>
+        {[
+          ['Applicant',    form.full_name],
+          ['Coverage',     sumDisplay],
+          ['Base Premium', `₹${Number(product?.base_premium || 0).toLocaleString('en-IN')}/yr`],
+          ['GST (18%)',    `₹${Math.round((premium || 0) * 0.18).toLocaleString('en-IN')}`],
+        ].map(([k,v]) => (
           <div key={k} className="flex justify-between py-2.5 text-sm">
-            <span className="text-gray-400">{k}</span><span className="font-mono-dm">{v}</span>
+            <span className="text-gray-400">{k}</span>
+            <span className="font-mono-dm">{v}</span>
           </div>
         ))}
         <div className="flex justify-between pt-3.5 font-bold text-base">
           <span>Total Payable</span>
-          <span className="font-mono-dm text-brand">₹21,712</span>
+          <span className="font-mono-dm text-brand">₹{Math.round((premium || 0) * 1.18).toLocaleString('en-IN')}</span>
         </div>
       </div>
-      <FormGroup label="Payment Method">
-        <Select>
-          <option>Credit / Debit Card</option>
-          <option>Net Banking</option>
-          <option>UPI</option>
-          <option>EMI (0% interest)</option>
-        </Select>
-      </FormGroup>
-      <div className="grid grid-cols-2 gap-4">
-        <FormGroup label="Card Number"><Input placeholder="4532 •••• •••• 8123" /></FormGroup>
-        <FormGroup label="CVV"><Input placeholder="•••" maxLength="3" /></FormGroup>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+        ⚠ In demo mode, payment is simulated. Your policy will be created and sent for underwriter approval.
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <FormGroup label="Expiry"><Input placeholder="MM / YY" /></FormGroup>
-        <FormGroup label="Name on Card"><Input placeholder="ARJUN MEHTA" /></FormGroup>
-      </div>
-      <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-2">
-        🔒 Transactions secured by 256-bit SSL encryption
-      </div>
+
+      {paying && (
+        <div className="mt-4 text-center text-sm text-brand font-medium animate-pulse">
+          Processing payment…
+        </div>
+      )}
     </>
   )
 }
 
-// ── Step 4 — Success ──────────────────────────────────────
-function StepSuccess() {
+// ── Step 4: Success ───────────────────────────────────────
+function StepSuccess({ policyNumber, product, form }) {
   return (
-    <>
-      <div className="text-center py-4 mb-5">
-        <div className="text-5xl mb-3">🎉</div>
-        <h3 className="font-display text-xl font-bold mb-1">Policy Issued Successfully!</h3>
-        <p className="text-sm text-gray-400">Your certificate has been emailed to you.</p>
-      </div>
-      <div className="border border-gray-100 rounded-xl overflow-hidden">
-        <div className="bg-brand px-5 py-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-lg">🛡️</div>
-          <div className="flex-1">
-            <div className="font-display font-black text-white text-base">ShieldX</div>
-            <div className="text-white/60 text-[10px] uppercase tracking-widest">Insurance Policy Certificate</div>
-          </div>
-          <div className="font-mono-dm text-white/60 text-xs">QR: 2026-00892</div>
+    <div className="text-center py-4">
+      <div className="text-5xl mb-4">🎉</div>
+      <h3 className="font-display text-xl font-bold mb-1">Application Submitted!</h3>
+      <div className="font-mono-dm text-brand text-lg font-bold mb-2">{policyNumber}</div>
+      <p className="text-sm text-gray-400 mb-6 max-w-xs mx-auto">
+        Your policy application is now <strong>pending underwriter review</strong>. You'll be notified once it's approved.
+      </p>
+      <div className="bg-surface border border-gray-100 rounded-xl p-4 text-left text-sm">
+        <div className="flex justify-between py-1.5 border-b border-gray-100">
+          <span className="text-gray-400">Product</span>
+          <span className="font-medium">{product?.name}</span>
         </div>
-        <div className="p-5 divide-y divide-gray-50 text-sm">
-          {[
-            ['Policy Number', 'SHX-LI-2026-00892'],
-            ['Policyholder',  'Arjun Mehta'],
-            ['Sum Assured',   '₹50,00,000'],
-            ['Premium Paid',  '₹21,712 ✓'],
-            ['Issue Date',    '01 March 2026'],
-            ['Valid Until',   '01 March 2046'],
-          ].map(([k, v]) => (
-            <div key={k} className="flex justify-between py-2.5">
-              <span className="text-gray-400">{k}</span>
-              <span className={`font-mono-dm font-medium ${k === 'Premium Paid' ? 'text-green-600' : 'text-gray-800'}`}>{v}</span>
-            </div>
-          ))}
+        <div className="flex justify-between py-1.5 border-b border-gray-100">
+          <span className="text-gray-400">Applicant</span>
+          <span className="font-medium">{form.full_name}</span>
+        </div>
+        <div className="flex justify-between py-1.5">
+          <span className="text-gray-400">Status</span>
+          <span className="text-yellow-600 font-semibold">Pending Approval</span>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
 // ── Main Modal ────────────────────────────────────────────
-export default function PurchaseModal({ onClose, productType = 'Life Insurance' }) {
-  const toast   = useToast()
-  const [step, setStep] = useState(1)
-  const [paying, setPaying] = useState(false)
+export default function PurchaseModal({ onClose }) {
+  const toast       = useToast()
+  const { user }    = useAuth()
+
+  const [step,      setStep]      = useState(1)
+  const [products,  setProducts]  = useState([])
+  const [selected,  setSelected]  = useState(null)
+  const [paying,    setPaying]    = useState(false)
+  const [policyNum, setPolicyNum] = useState('')
+  const [error,     setError]     = useState('')
+
+  const [form, setForm] = useState({
+    full_name:   user?.full_name || '',
+    dob:         '',
+    gender:      '',
+    phone:       user?.phone || '',
+    sum_assured: '1000000',
+    term_years:  '1',
+    vehicle_reg: '',
+  })
+
+  useEffect(() => {
+    productsAPI.list()
+      .then(d => {
+        const prods = d.products || []
+        setProducts(prods)
+        if (prods.length) setSelected(prods[0])
+      })
+      .catch(() => {})
+  }, [])
+
+  // Simple premium estimate
+  const basePremium = selected ? (+selected.base_premium || 0) : 0
+  const premium     = basePremium > 0
+    ? Math.round(basePremium * +form.term_years)
+    : Math.round((+form.sum_assured || 0) * 0.02) // 2% of IDV for vehicle
 
   const next = async () => {
-    if (step === 3) {
+    setError('')
+
+    if (step === 1) {
+      if (!selected) { toast('Please select a plan', 'info'); return }
+      setStep(2)
+    } else if (step === 2) {
+      if (!form.full_name) { setError('Full name is required'); return }
+      if (!form.dob)       { setError('Date of birth is required'); return }
+      if (!form.sum_assured || +form.sum_assured <= 0) { setError('Please enter a valid coverage amount'); return }
+      if (selected?.type === 'vehicle' && !form.vehicle_reg) { setError('Vehicle registration number is required'); return }
+      setStep(3)
+    } else if (step === 3) {
+      // Simulate payment then create policy
       setPaying(true)
-      toast('Processing payment...', 'info')
-      await new Promise(r => setTimeout(r, 1500))
-      setPaying(false)
-      toast('Payment successful! Policy SHX-LI-2026-00892 issued ✓', 'success')
-      setStep(4)
-    } else if (step < 4) {
-      setStep(s => s + 1)
+      await new Promise(r => setTimeout(r, 1200))
+      try {
+        const today    = new Date()
+        const endDate  = new Date(today)
+        endDate.setFullYear(endDate.getFullYear() + +form.term_years)
+
+        // Call backend to create the policy (pending approval)
+        const payload = {
+          product_id:    selected.id,
+          sum_assured:   +form.sum_assured,
+          total_premium: premium,
+          start_date:    today.toISOString().split('T')[0],
+          end_date:      endDate.toISOString().split('T')[0],
+          nominee_name:  '',
+        }
+
+        const data = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/policies/demo`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('shieldx_token')}`,
+          },
+          body: JSON.stringify(payload),
+        }).then(r => r.json())
+
+        if (data.error) throw new Error(data.error)
+
+        setPolicyNum(data.policy?.policy_number || 'SHX-NEW')
+        setStep(4)
+        toast(`Policy ${data.policy?.policy_number} created — pending approval!`, 'success')
+      } catch (err) {
+        setError(err.message || 'Something went wrong. Please try again.')
+      } finally {
+        setPaying(false)
+      }
     }
   }
 
   const footer = step === 4 ? (
-    <>
-      <BtnGhost onClick={onClose}>Close</BtnGhost>
-      <BtnBrand onClick={() => { toast('Certificate downloaded as PDF ✓', 'success'); onClose() }}>
-        ⬇ Download PDF
-      </BtnBrand>
-    </>
+    <BtnBrand onClick={() => onClose(true)}>View My Policies →</BtnBrand>
   ) : (
     <>
-      {step > 1 && <BtnGhost onClick={() => setStep(s => s - 1)}>← Back</BtnGhost>}
-      <BtnBrand onClick={next} className="ml-auto">
-        {paying ? 'Processing…' : step === 3 ? '💳 Pay Now' : 'Continue →'}
+      {step > 1 && <BtnGhost onClick={() => { setStep(s => s - 1); setError('') }}>← Back</BtnGhost>}
+      <BtnBrand onClick={next} className="ml-auto min-w-[130px]">
+        {paying ? 'Processing…' : step === 3 ? '💳 Confirm & Pay' : 'Continue →'}
       </BtnBrand>
     </>
   )
 
   return (
-    <Modal title={`Purchase — ${productType}`} onClose={onClose} footer={footer} wide>
+    <Modal title={step === 4 ? 'Policy Created' : 'Purchase Insurance'} onClose={() => onClose(false)} footer={footer} wide>
       <StepBar current={step} />
-      {step === 1 && <StepProposal />}
-      {step === 2 && <StepKYC toast={toast} />}
-      {step === 3 && <StepPayment />}
-      {step === 4 && <StepSuccess />}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-4">⚠ {error}</div>
+      )}
+
+      {step === 1 && <StepPlan   products={products} selected={selected} onSelect={setSelected} />}
+      {step === 2 && <StepDetails product={selected} form={form} setForm={setForm} user={user} />}
+      {step === 3 && <StepReview  product={selected} form={form} premium={premium} paying={paying} />}
+      {step === 4 && <StepSuccess policyNumber={policyNum} product={selected} form={form} />}
     </Modal>
   )
 }
