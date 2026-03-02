@@ -39,6 +39,7 @@ export const policiesAPI = {
 export const claimsAPI = {
   my:           ()      => get('/claims/my'),
   all:          (p)     => get(`/claims?${new URLSearchParams(p)}`),
+  get:          (id)    => get(`/claims/${id}`),
   updateStatus: (id, d) => put(`/claims/${id}/status`, d),
   file: (formData) => {
     const token = localStorage.getItem('shieldx_token')
