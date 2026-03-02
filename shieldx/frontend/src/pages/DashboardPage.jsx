@@ -6,6 +6,7 @@ import ClaimModal from '../components/ClaimModal'
 import ClaimTimelineModal from '../components/ClaimTimelineModal'
 import PurchaseModal from '../components/PurchaseModal'
 import { useToast } from '../App'
+import { useAuth } from '../context/AuthContext'
 
 const TABS = [
   { id: 'overview',   icon: '🏠', label: 'Overview'    },
@@ -246,11 +247,17 @@ function DocumentsTab({ onCert }) {
 // ── Dashboard Page ────────────────────────────────────────
 export default function DashboardPage() {
   const toast = useToast()
+  const { user } = useAuth()
   const [tab,       setTab]       = useState('overview')
   const [certPolicy, setCertPolicy] = useState(null)
   const [claimModal, setClaimModal] = useState(false)
   const [timeline,   setTimeline]   = useState(null)
   const [newPolicy,  setNewPolicy]  = useState(false)
+
+  // Use real user data, fall back to placeholder if somehow not logged in
+  const displayName  = user?.full_name  || 'My Account'
+  const displayEmail = user?.email      || ''
+  const avatarLetter = (user?.full_name || 'U').charAt(0).toUpperCase()
 
   return (
     <>
@@ -259,10 +266,12 @@ export default function DashboardPage() {
         <aside className="bg-white border-r border-gray-100 px-3 py-5 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto hidden md:flex flex-col">
           {/* User */}
           <div className="flex items-center gap-3 px-2 mb-6">
-            <div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white font-bold text-base">A</div>
-            <div>
-              <div className="font-semibold text-sm">Arjun Mehta</div>
-              <div className="text-xs text-gray-400">arjun.mehta@mail.com</div>
+            <div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white font-bold text-base">
+              {avatarLetter}
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate">{displayName}</div>
+              <div className="text-xs text-gray-400 truncate">{displayEmail}</div>
             </div>
           </div>
 

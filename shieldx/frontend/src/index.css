@@ -10,8 +10,15 @@
   --color-accent-dark: #b87d10;
   --color-surface: #f7f9f8;
   --color-danger: #c0392b;
-}
 
+  --font-family-display: "Playfair Display", serif;
+  --font-family-sans: "DM Sans", sans-serif;
+  --font-family-mono: "DM Mono", monospace;
+
+  --shadow-card: 0 2px 16px 0 rgba(15,76,53,0.08);
+  --shadow-float: 0 8px 40px 0 rgba(15,76,53,0.14);
+  --shadow-glow: 0 0 32px 0 rgba(232,160,32,0.25);
+}
 @layer base {
   * { box-sizing: border-box; }
   body { font-family: 'DM Sans', sans-serif; }
@@ -19,21 +26,28 @@
 }
 
 @layer utilities {
-  .font-display  { font-family: 'Playfair Display', serif; }
-  .font-mono-dm  { font-family: 'DM Mono', monospace; }
+  .font-display { font-family: 'Playfair Display', serif; }
+  .font-mono-dm { font-family: 'DM Mono', monospace; }
 }
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
+  50% { opacity: 0.35; }
 }
+
 @keyframes modal-in {
   from { opacity: 0; transform: scale(0.92) translateY(16px); }
   to   { opacity: 1; transform: scale(1)    translateY(0);    }
 }
+
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(24px); }
   to   { opacity: 1; transform: translateX(0);    }
+}
+
+@keyframes bar-grow {
+  from { height: 0; }
+  to   { height: var(--bar-h); }
 }
 
 .animate-pulse-dot { animation: pulse-dot 2s infinite; }

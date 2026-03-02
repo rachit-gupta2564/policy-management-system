@@ -1,3 +1,5 @@
+// ── Premium calculation engine ──────────────────────────────
+
 export function calcVehicle({ idv, makeFactor, yearFactor, coverageFactor, ncbRate, addons }) {
   const base   = idv * 0.02 * makeFactor * yearFactor * coverageFactor
   const ncb    = base * ncbRate
@@ -28,4 +30,5 @@ export function calcLife({ age, termYears, sumLakhs, smokerFactor }) {
   return { base, ncb: 0, addons: 0, gst, total, ageFactor, termFactor }
 }
 
-export const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN')
+export const fmt = (n) =>
+  '₹' + Math.round(n).toLocaleString('en-IN')
